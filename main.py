@@ -5,20 +5,15 @@ import re
 
 
 movie_data  = pd.read_csv('movie_metadata.csv')
-mean_gross = 0
-
-def calculate_mean_gross():
-    global mean_gross
-    mean_gross = movie_data['gross'].sum() / len(movie_data)
-    print mean_gross
 
 def calculate_movie_profitable():
     #Row numbers where movie made profit i.e successful movies
     rows_id = movie_data[movie_data['gross'] > movie_data['budget']].index
-    for row in range(len(movie_data)):
-        if row == 
-
-    
+    for index, colunm in movie_data.iterrows():
+        if index in rows_id:
+            movie_data['profitable'] = 1
+        else:
+            movie_data['profitable'] = 0
 
 def preprocess_movie_dataframe():
     global movie_data
@@ -45,7 +40,7 @@ def preprocess_movie_dataframe():
 def atribute_mapping():
     #Mapping for colour
     colour_mapping = {'Color':0, 'Black and White': 1}
-    movie_data['Color'] = movie_data['Color'].map(colour_mapping)
+    movie_data['color'] = movie_data['color'].map(colour_mapping)
 
     #Mapping Values for Content-Rating
     content_rating_mapping = {'G':0, 'PG':1, 'PG-13':2, 'R':3}
@@ -119,4 +114,4 @@ def atribute_mapping():
 preprocess_movie_dataframe()
 calculate_mean_gross() 
 calculate_movie_profitable()
-atribute_mapping()
+#atribute_mapping()
