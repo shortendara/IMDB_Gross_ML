@@ -13,13 +13,12 @@ def calculate_mean_gross():
     print mean_gross
 
 def calculate_movie_profitable():
-    '''
-    Compare budget and gross create colunm with binary values
-    if the movie made a profit or not. Use new colunm as target 
-    colunm
-    ''' 
+    #Row numbers where movie made profit i.e successful movies
     rows_id = movie_data[movie_data['gross'] > movie_data['budget']].index
+    for row in range(len(movie_data)):
+        if row == 
 
+    
 
 def preprocess_movie_dataframe():
     global movie_data
@@ -44,6 +43,10 @@ def preprocess_movie_dataframe():
     del movie_data['movie_facebook_likes']
 
 def atribute_mapping():
+    #Mapping for colour
+    colour_mapping = {'Color':0, 'Black and White': 1}
+    movie_data['Color'] = movie_data['Color'].map(colour_mapping)
+
     #Mapping Values for Content-Rating
     content_rating_mapping = {'G':0, 'PG':1, 'PG-13':2, 'R':3}
     movie_data['content_rating'] = movie_data['content_rating'].map(content_rating_mapping)
