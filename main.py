@@ -2,6 +2,8 @@
 import pandas as pd
 from sklearn.preprocessing import Imputer
 import re
+from sklearn import cross_validation
+from sklearn.svm import SVR
 
 
 movie_data  = pd.read_csv('movie_metadata.csv')
@@ -11,17 +13,17 @@ def calculate_movie_profitable():
     rows_id = movie_data[movie_data['gross'] > movie_data['budget']].index
     for index, colunm in movie_data.iterrows():
         if index in rows_id:
-            movie_data['profitable'] = 1
+            movie_data['profitable'] = 2
         else:
-            movie_data['profitable'] = 0
-
+            movie_data['profitable'] = 1
+    del movie_data['gross']
 def preprocess_movie_dataframe():
     global movie_data
     #Set null movie durations to mean
     duration_imputer = Imputer(missing_values = 'NaN', strategy = 'mean', axis=1)
     duration_column = duration_imputer.fit_transform(movie_data['duration']).T
     movie_data['duration'] = duration_column
-    
+
     #Drop rows without a gross value
     movie_data = movie_data[pd.notnull(movie_data['gross'])]
     
@@ -37,21 +39,38 @@ def preprocess_movie_dataframe():
     #Delete movie facebook likes
     del movie_data['movie_facebook_likes']
 
+    del movie_data['plot_keywords']
+
+    del movie_data['genres']
+
+    del movie_data['director_name']
+
+    del movie_data['actor_1_name']
+
+    del movie_data['actor_2_name']
+
+    del movie_data['actor_3_name']
+
+    del movie_data['movie_title']
+
+    #Drop any row containing NaN
+    movie_data.dropna()
+
 def atribute_mapping():
     #Mapping for colour
-    colour_mapping = {'Color':0, 'Black and White': 1}
+    colour_mapping = {'Color':1, 'Black and White': 2}
     movie_data['color'] = movie_data['color'].map(colour_mapping)
 
     #Mapping Values for Content-Rating
-    content_rating_mapping = {'G':0, 'PG':1, 'PG-13':2, 'R':3}
+    content_rating_mapping = {'G':1, 'PG':2, 'PG-13':3, 'R':4}
     movie_data['content_rating'] = movie_data['content_rating'].map(content_rating_mapping)
 
     #Mapping values for countries
     countries = movie_data['country']
     countries = set(countries)
     country_mapping = {}
-
     country_counter = 1
+
     for country in countries:
         country_mapping[country] = country_counter
         country_counter += 1
@@ -62,14 +81,15 @@ def atribute_mapping():
     languages = movie_data['language']
     languages = set(languages)
     language_mapping = {}
-
     language_counter = 1
+
     for language in languages:
         language_mapping[language] = language_counter
         language_counter += 1
 
     movie_data['language'] = movie_data['language'].map(language_mapping)
 
+    '''
     #Mapping values for movie genre
     genres = movie_data['genres']
     total_genres = set(genres)
@@ -84,6 +104,7 @@ def atribute_mapping():
         #Must convert genre into set or remove duplicate values
         unique_genres.add(genre[0])
 
+    
     #Assign each genre a numerical value
     for genre in unique_genres:
         #Access first genre type and use as default genre
@@ -91,6 +112,8 @@ def atribute_mapping():
         genre_counter += 1
     
     movie_data['genres'] = movie_data['genres'].map(genre_mapping)
+    '''
+
 
     '''
     #Mapping values for Director
@@ -110,8 +133,17 @@ def atribute_mapping():
     movie_diration_mapping = {}
     '''
 
+def calculate_probability():
+    movie_data_array = movie_data.as_matrix()
+    target = movie_data_array[:,15]
+    data = movie_data_array[:,0:14]
+    estimator = SVR(kernel="linear")
+
+    scores = cross_validation.cross_val_score(estimator, target, data, cv=10)
+    print "initial values:" + scores.mean()
    
 preprocess_movie_dataframe()
-calculate_mean_gross() 
 calculate_movie_profitable()
-#atribute_mapping()
+atribute_mapping()
+calculate_probability()
+print movie_data.head()
