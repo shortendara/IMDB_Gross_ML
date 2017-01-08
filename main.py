@@ -4,21 +4,47 @@ from sklearn.preprocessing import Imputer
 import re
 from sklearn import cross_validation
 from sklearn.svm import SVR
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn import naive_bayes
+from sklearn import tree
+from sklearn import preprocessing
+import matplotlib.pyplot as plt
 
 
 movie_data  = pd.read_csv('movie_metadata.csv')
+unique_genres = set()
+overall_mean = 0
 
-def calculate_movie_profitable():
-    #Row numbers where movie made profit i.e successful movies
-    rows_id = movie_data[movie_data['gross'] > movie_data['budget']].index
-    for index, colunm in movie_data.iterrows():
-        if index in rows_id:
-            movie_data['profitable'] = 2
-        else:
-            movie_data['profitable'] = 1
-    del movie_data['gross']
+def calculate_mean():
+    global movie_data
+    global overall_mean
+    movie_data = movie_data.dropna()
+    overall_mean = round(movie_data['gross'].mean(), 0)
+    gross_row = pd.Series(movie_data['gross'])
+    gross_buckets = [100000, 1000000, 10000000, 100000000]
+    gross_row[gross_row < gross_buckets[0]] = 5
+    gross_row[gross_row > gross_buckets[3]] = 1
+    gross_row[gross_row > gross_buckets[2]] = 2
+    gross_row[gross_row > gross_buckets[1]] = 3
+    gross_row[gross_row > gross_buckets[0]] = 4
+    movie_data['gross'] = gross_row
+            
+
+#Normalise data
+def normalise_data():
+    global movie_data
+    scalingObj = preprocessing.MinMaxScaler()
+    normalised_data = scalingObj.fit_transform(movie_data)
+    movie_data = normalised_data
+    
 def preprocess_movie_dataframe():
     global movie_data
+    global unique_genres
+    
+    #Remove all movies not made in the US    
+    movie_data = movie_data[movie_data['country'].str.contains("USA") == True]
     #Set null movie durations to mean
     duration_imputer = Imputer(missing_values = 'NaN', strategy = 'mean', axis=1)
     duration_column = duration_imputer.fit_transform(movie_data['duration']).T
@@ -39,24 +65,67 @@ def preprocess_movie_dataframe():
     #Delete movie facebook likes
     del movie_data['movie_facebook_likes']
 
+    #Gather unique genres
+    for index, row in movie_data.iterrows():
+        genre  = re.sub('[|]', ' ', row['genres'])
+        genre = genre.split() 
+        unique_genres.add(genre[0])  
+        '''
+        If movie contains multilpe genres set genre of movie to be 
+        first genre declared in list of genres
+        '''
+        movie_data.set_value(index, 'genres', genre[0])
+        
+    '''
+    Sum total facebook actor likes with total director facebook likes to determine
+    the hwo famous the cast of each movie is
+    '''
+    movie_data['cast_total_facebook_likes'] = movie_data['cast_total_facebook_likes'] + movie_data['director_facebook_likes']
+
+    #Drop all unncecessary colunms
     del movie_data['plot_keywords']
-
-    del movie_data['genres']
-
     del movie_data['director_name']
-
+    del movie_data['director_facebook_likes']
     del movie_data['actor_1_name']
-
+    del movie_data['actor_1_facebook_likes']
     del movie_data['actor_2_name']
-
+    del movie_data['actor_2_facebook_likes']
     del movie_data['actor_3_name']
-
+    del movie_data['actor_3_facebook_likes']
     del movie_data['movie_title']
+    
+    '''
+    Because we can't determine the total number of votes casted on a movie that
+    hasn't been released we will drop the columns that contain these votes
+    '''
+    del movie_data['num_voted_users']
+    del movie_data['num_critic_for_reviews']
 
-    #Drop any row containing NaN
-    movie_data.dropna()
-
+def runClassifiers(data, target):
+    
+    dTree = tree.DecisionTreeClassifier()
+    scores = cross_validation.cross_val_score(dTree, data, target, cv=10)
+    print "Tree : ", scores.mean()
+    
+    rbfSvm = SVC()
+    scores = cross_validation.cross_val_score(rbfSvm, data, target, cv=10)
+    print "SVM : ", scores.mean()
+    
+    nearestN = KNeighborsClassifier()
+    scores = cross_validation.cross_val_score(nearestN, data, target, cv=10)
+    print "NNeighbour : ", scores.mean()
+    
+    randomForest = RandomForestClassifier()
+    scores = cross_validation.cross_val_score(randomForest, data, target, cv=10)
+    print "RForest : ",scores.mean()
+    
+    nBayes = naive_bayes.GaussianNB()
+    scores = cross_validation.cross_val_score(nBayes, data, target, cv=10)
+    print "Naive Bayes : ",scores.mean()
+  
+    
 def atribute_mapping():
+    global movie_data
     #Mapping for colour
     colour_mapping = {'Color':1, 'Black and White': 2}
     movie_data['color'] = movie_data['color'].map(colour_mapping)
@@ -65,85 +134,41 @@ def atribute_mapping():
     content_rating_mapping = {'G':1, 'PG':2, 'PG-13':3, 'R':4}
     movie_data['content_rating'] = movie_data['content_rating'].map(content_rating_mapping)
 
-    #Mapping values for countries
-    countries = movie_data['country']
-    countries = set(countries)
-    country_mapping = {}
-    country_counter = 1
-
-    for country in countries:
-        country_mapping[country] = country_counter
-        country_counter += 1
-
-    movie_data['country'] = movie_data['country'].map(country_mapping)
-
-    #Mapping for languages
-    languages = movie_data['language']
-    languages = set(languages)
-    language_mapping = {}
-    language_counter = 1
-
-    for language in languages:
-        language_mapping[language] = language_counter
-        language_counter += 1
-
-    movie_data['language'] = movie_data['language'].map(language_mapping)
-
-    '''
-    #Mapping values for movie genre
-    genres = movie_data['genres']
-    total_genres = set(genres)
-    unique_genres =set()
-    genre_mapping = {}
-    genre_counter = 1
-
-    #Gather unique genres
-    for genre in total_genres:
-        genre  = re.sub('[|]', ' ', genre)
-        genre = genre.split()
-        #Must convert genre into set or remove duplicate values
-        unique_genres.add(genre[0])
-
+    #Perform one-hot encoding for country column
+    movie_data = pd.get_dummies(movie_data, columns=["country"])
     
-    #Assign each genre a numerical value
-    for genre in unique_genres:
-        #Access first genre type and use as default genre
-        genre_mapping[genre] = genre_counter
-        genre_counter += 1
+    #Perform one-hot encoding for language column
+    movie_data = pd.get_dummies(movie_data, columns=["language"])
+
+    #Perform one-hot encoding for genres column
+    movie_data = pd.get_dummies(movie_data, columns=["genres"])   
     
-    movie_data['genres'] = movie_data['genres'].map(genre_mapping)
-    '''
+def plot_graphs():
+    sub_set = movie_data.head(1000)
+    X = sub_set['cast_total_facebook_likes']
+    Y = sub_set['gross']
+    plt.xlabel("Cast Facebook Likes")
+    plt.ylabel("Gross")
+    plt.scatter(X, Y, marker="o", c=Y)
+    plt.show()
+    
+    
+  
+def main():
+    preprocess_movie_dataframe()
+    atribute_mapping()
+    plot_graphs()
+    #calculate_mean()
+    target = movie_data['gross']
+    data = movie_data.drop(['gross'], axis=1)
+    
+    #runClassifiers(data, target)
+    
+    print "Normalising data..."
+    #normalise_data()
+    
+    #runClassifiers(data, target)
 
+    #
 
-    '''
-    #Mapping values for Director
-    director_like_mapping = {}
-    print movie_data['director_facebook_likes']
-    #print movie_data.head()
-    #Mapping values for first Actor
-    actor_like_mapping ={}
-
-    #Mapping values for second Actor
-    second_actor_mapping = {}
-
-    #Mapping values for third Actor
-    third_actor_mapping = {}
-
-    #Mapping values for movie duration
-    movie_diration_mapping = {}
-    '''
-
-def calculate_probability():
-    movie_data_array = movie_data.as_matrix()
-    target = movie_data_array[:,15]
-    data = movie_data_array[:,0:14]
-    estimator = SVR(kernel="linear")
-
-    scores = cross_validation.cross_val_score(estimator, target, data, cv=10)
-    print "initial values:" + scores.mean()
-   
-preprocess_movie_dataframe()
-calculate_movie_profitable()
-atribute_mapping()
-calculate_probability()
-print movie_data.head()
+main()
